@@ -121,21 +121,24 @@ class AudioManager {
 
   static Future<void> fadeIn(AudioPlayer player) async {
     for (double volume = 0.0; volume <= 1.0; volume += 0.1) {
+      print('volume: $volume');
       await player.setVolume(volume);
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(milliseconds: 100));
     }
   }
 
   static Future<void> fadeOut(AudioPlayer player) async {
     for (double volume = 1.0; volume >= 0.0; volume -= 0.1) {
+      print('volume: $volume');
       await player.setVolume(volume);
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(const Duration(milliseconds: 100));
     }
   }
 
   static Future<void> playAudio(List<AudioPlayer> players) async {
     for (var i = 0; i < players.length; i++) {
       late Duration duration;
+      late Duration position;
       await players[i].onDurationChanged.listen((Duration d) {
         duration = d;
         print('file ${i + 1} duration: $d');
@@ -143,13 +146,15 @@ class AudioManager {
 
       var player = players[i];
       print('Playing sound ${i + 1}');
-      await fadeIn(player);
       await player.resume();
 
+      await fadeIn(player);
       bool isTransitioning = false;
       player.onPositionChanged.listen((Duration pos) {
         // while position is changing
         // get current duration
+        position = pos;
+        print(duration - pos);
         if (!isTransitioning && duration - pos < Duration(seconds: 2)) {
           // start transitioning to play the next audio
           isTransitioning = true;
@@ -166,9 +171,12 @@ class AudioManager {
         }
       });
 
-      // Wait for this audio to start transitioning before moving to next one
+      // start playing next audio
       while (!isTransitioning) {
         await Future.delayed(Duration(milliseconds: 100));
+      }
+      while (isTransitioning && player.volume >= 0.01) {
+        await fadeOut(player);
       }
 
       // reset position to start again once audio is done
@@ -176,9 +184,6 @@ class AudioManager {
         await player.seek(Duration.zero);
         await player.pause();
       }
-
-      // Optionally, fade out the audio
-      await fadeOut(player);
     }
   }
 
