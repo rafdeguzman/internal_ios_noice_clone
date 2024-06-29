@@ -44,7 +44,7 @@ class _HomeState extends State<Home> {
     }
 
     AudioPlayer player = players[index]; // Use existing or new player
-    await player.setVolume(1.0);
+    await player.setVolume(0.0); // Start with volume at 0
     player.setPlayerMode(PlayerMode.mediaPlayer);
     player.setReleaseMode(ReleaseMode.loop);
 
@@ -70,6 +70,12 @@ class _HomeState extends State<Home> {
 
     await player.play(UrlSource(softWindUrls[index]));
     print('Playing audio ${index + 1}');
+
+    // Gradually increase volume from 0 to 1
+    for (double vol = 0; vol <= 1; vol += 0.1) {
+      await Future.delayed(Duration(milliseconds: 100));
+      await player.setVolume(vol);
+    }
   }
 
   @override
