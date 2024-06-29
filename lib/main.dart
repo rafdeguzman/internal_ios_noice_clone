@@ -111,6 +111,7 @@ class AudioManager {
   final List<AudioPlayer> players;
   int currentIndex = 0;
   bool isTransitioning = false;
+  Map<int, Duration> audioDurations = {};
 
   AudioManager(this.softWindUrls)
       : players = List.generate(softWindUrls.length, (_) => AudioPlayer());
@@ -123,20 +124,25 @@ class AudioManager {
     final player = players[index];
     await player.setReleaseMode(ReleaseMode.loop);
     await player.setSourceUrl(softWindUrls[index]);
-    await player.setVolume(0.0);
-    await player.resume();
-    await _fadeIn(player, index);
-    print('Playing audio ${index + 1}');
+    await player.setVolume(1.0);
 
-    // Schedule transition to next audio
-    _scheduleNextAudio(player, index);
+    player.onDurationChanged.listen((Duration d) {
+      print('Audio ${index + 1} duration: $d');
+      audioDurations[index] = d;
+      if (!isTransitioning) {
+        _scheduleNextAudio(player, index);
+      }
+    });
+
+    await player.resume();
+    print('Playing audio ${index + 1}');
   }
 
   Future<void> _fadeIn(AudioPlayer player, int index) async {
     print('Fading in audio ${index + 1}');
     for (double vol = 0.0; vol <= 1.0; vol += 0.1) {
       await player.setVolume(vol);
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(Duration(milliseconds: 50));
     }
   }
 
@@ -144,30 +150,38 @@ class AudioManager {
     print('Fading out audio ${index + 1}');
     for (double vol = 1.0; vol >= 0.0; vol -= 0.1) {
       await player.setVolume(vol);
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(Duration(milliseconds: 50));
     }
   }
 
   void _scheduleNextAudio(AudioPlayer currentPlayer, int currentIndex) {
+    if (!audioDurations.containsKey(currentIndex)) return;
+
+    Duration totalDuration = audioDurations[currentIndex]!;
+    Duration transitionPoint = totalDuration - Duration(milliseconds: 1500);
+
     currentPlayer.onPositionChanged.listen((position) async {
-      if (isTransitioning) return;
+      if (isTransitioning || position < transitionPoint) return;
 
-      Duration? totalDuration = await currentPlayer.getDuration();
-      if (totalDuration == null) return;
+      isTransitioning = true;
+      int nextIndex = (currentIndex + 1) % softWindUrls.length;
 
-      Duration transitionPoint = totalDuration - Duration(seconds: 1);
-      if (position >= transitionPoint) {
-        isTransitioning = true;
-        int nextIndex = (currentIndex + 1) % softWindUrls.length;
+      // Start next audio and fade it in
+      final nextPlayer = players[nextIndex];
+      await _setupAndPlayAudio(nextIndex);
+      _fadeIn(nextPlayer, nextIndex);
 
-        // Start fading out current audio
-        await _fadeOut(currentPlayer, currentIndex);
+      // Wait a bit before starting to fade out the current audio
+      await Future.delayed(Duration(milliseconds: 500));
 
-        // Start next audio
-        await _setupAndPlayAudio(nextIndex);
+      // Fade out current audio
+      await _fadeOut(currentPlayer, currentIndex);
 
-        isTransitioning = false;
-      }
+      // Stop the current player after fade out
+      await currentPlayer.stop();
+
+      currentIndex = nextIndex;
+      isTransitioning = false;
     });
   }
 
