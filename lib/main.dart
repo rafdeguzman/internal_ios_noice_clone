@@ -34,44 +34,44 @@ class _HomeState extends State<Home> {
   }
 
   void playAudio(int index) async {
-    if (index >= softWindUrls.length) index = 0; // Loop back to the first audio
+    if (index >= softWindUrls.length) index = 0;
 
-    if (isPlaying[index]) return; // If already playing, return
+    if (isPlaying[index]) return;
 
-    // Ensure the players list can hold the new player
     if (index >= players.length) {
-      players.add(AudioPlayer()); // Add new player if needed
+      players.add(AudioPlayer());
     }
 
-    AudioPlayer player = players[index]; // Use existing or new player
-    await player.setVolume(0.0); // Start with volume at 0
-    player.setPlayerMode(PlayerMode.mediaPlayer);
-    player.setReleaseMode(ReleaseMode.loop);
+    AudioPlayer player = players[index];
 
-    // Mark as playing
-    isPlaying[index] = true;
-
-    // Listen for duration update to schedule next audio
+    // Set up listeners if not already set
     player.onDurationChanged.listen((Duration d) async {
-      var duration = d;
-      // Schedule next audio 2 seconds before current ends
-      Future.delayed(duration - Duration(seconds: 2), () {
-        if (index + 1 < softWindUrls.length) {
-          playAudio(index + 1); // Schedule next audio
+      Future.delayed(d - Duration(seconds: 1), () async {
+        if (!isPlaying[index]) return;
+
+        for (double vol = 1.0; vol >= 0; vol -= 0.1) {
+          await Future.delayed(Duration(milliseconds: 100));
+          await player.setVolume(vol);
         }
+
+        isPlaying[index] = false;
+        playAudio((index + 1) % softWindUrls.length);
       });
     });
 
-    // Listen for audio completion to update playing status
     player.onPlayerComplete.listen((event) {
+      isPlaying[index] = false;
       print('Audio ${index + 1} completed');
-      isPlaying[index] = false; // Mark as not playing
     });
+
+    await player.setVolume(0.0);
+    player.setPlayerMode(PlayerMode.mediaPlayer);
+    player.setReleaseMode(ReleaseMode.loop);
+    isPlaying[index] = true;
 
     await player.play(UrlSource(softWindUrls[index]));
     print('Playing audio ${index + 1}');
 
-    // Gradually increase volume from 0 to 1
     for (double vol = 0; vol <= 1; vol += 0.1) {
       await Future.delayed(Duration(milliseconds: 100));
       await player.setVolume(vol);
@@ -82,7 +82,12 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     softWindUrls = getSoftWindUrls();
-    playAudio(0); // Start playing from the first audio
+    playAudioManager(softWindUrls);
+  }
+
+  void playAudioManager(audios) {
+    AudioManager audioManager = AudioManager(audios);
+    audioManager.startPlayback();
   }
 
   @override
@@ -98,5 +103,77 @@ class _HomeState extends State<Home> {
         child: Text('Hello, World!'),
       ),
     );
+  }
+}
+
+class AudioManager {
+  final List<String> softWindUrls;
+  final List<AudioPlayer> players;
+  int currentIndex = 0;
+  bool isTransitioning = false;
+
+  AudioManager(this.softWindUrls)
+      : players = List.generate(softWindUrls.length, (_) => AudioPlayer());
+
+  Future<void> startPlayback() async {
+    await _setupAndPlayAudio(currentIndex);
+  }
+
+  Future<void> _setupAndPlayAudio(int index) async {
+    final player = players[index];
+    await player.setReleaseMode(ReleaseMode.loop);
+    await player.setSourceUrl(softWindUrls[index]);
+    await player.setVolume(0.0);
+    await player.resume();
+    await _fadeIn(player, index);
+    print('Playing audio ${index + 1}');
+
+    // Schedule transition to next audio
+    _scheduleNextAudio(player, index);
+  }
+
+  Future<void> _fadeIn(AudioPlayer player, int index) async {
+    print('Fading in audio ${index + 1}');
+    for (double vol = 0.0; vol <= 1.0; vol += 0.1) {
+      await player.setVolume(vol);
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> _fadeOut(AudioPlayer player, int index) async {
+    print('Fading out audio ${index + 1}');
+    for (double vol = 1.0; vol >= 0.0; vol -= 0.1) {
+      await player.setVolume(vol);
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+  }
+
+  void _scheduleNextAudio(AudioPlayer currentPlayer, int currentIndex) {
+    currentPlayer.onPositionChanged.listen((position) async {
+      if (isTransitioning) return;
+
+      Duration? totalDuration = await currentPlayer.getDuration();
+      if (totalDuration == null) return;
+
+      Duration transitionPoint = totalDuration - Duration(seconds: 1);
+      if (position >= transitionPoint) {
+        isTransitioning = true;
+        int nextIndex = (currentIndex + 1) % softWindUrls.length;
+
+        // Start fading out current audio
+        await _fadeOut(currentPlayer, currentIndex);
+
+        // Start next audio
+        await _setupAndPlayAudio(nextIndex);
+
+        isTransitioning = false;
+      }
+    });
+  }
+
+  Future<void> stopAll() async {
+    for (var player in players) {
+      await player.stop();
+    }
   }
 }
