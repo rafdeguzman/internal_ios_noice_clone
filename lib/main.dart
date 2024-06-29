@@ -107,8 +107,9 @@ class AudioManager {
   */
   static Future<void> initAudioPlayers(
       List<UrlSource> audioUrls, List<AudioPlayer> players) async {
-    AudioPlayer player = AudioPlayer();
+    players.clear();
     for (var i = 0; i < audioUrls.length; i++) {
+      AudioPlayer player = AudioPlayer();
       await player.setSource(audioUrls[i]); // link the player to the file
       await player.setReleaseMode(
           ReleaseMode.stop); // set the mode after the file is completed
@@ -133,14 +134,29 @@ class AudioManager {
   }
 
   static Future<void> playAudio(List<AudioPlayer> players) async {
-    Future.forEach(players, (player) async {
-      print('playing sound');
+    for (var i = 0; i < players.length; i++) {
+      var player = players[i];
+      print('Playing sound ${i + 1}');
       await fadeIn(player);
       await player.resume();
+
+      // Wait for the player to complete
+      bool isCompleted = false;
       player.onPlayerComplete.listen((_) {
-        print('sound complete');
+        if (!isCompleted) {
+          isCompleted = true;
+          print('Sound ${i + 1} complete');
+        }
       });
-    });
+
+      // Wait for this audio to finish before moving to the next one
+      while (!isCompleted) {
+        await Future.delayed(Duration(milliseconds: 100));
+      }
+
+      // Optionally, fade out the audio
+      await fadeOut(player);
+    }
   }
 
   static void disposePlayers(List<AudioPlayer> players) {
