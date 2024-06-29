@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
@@ -19,9 +21,9 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
 // create lists of the players, per sound.
 
-  late List<AudioPlayer> softWindPlayers;
-  late List<AudioPlayer> rainPlayers;
-  late List<AudioPlayer> windChimePlayers;
+  late List<AudioPlayer> softWindPlayers = [];
+  late List<AudioPlayer> rainPlayers = [];
+  late List<AudioPlayer> windChimePlayers = [];
 
   // get the data of each sound
   var numSoftWind = 4;
@@ -131,13 +133,14 @@ class AudioManager {
   }
 
   static Future<void> playAudio(List<AudioPlayer> players) async {
-    for (AudioPlayer player in players) {
+    Future.forEach(players, (player) async {
       print('playing sound');
-      await player.resume(); // please block
+      await fadeIn(player);
+      await player.resume();
       player.onPlayerComplete.listen((_) {
         print('sound complete');
       });
-    }
+    });
   }
 
   static void disposePlayers(List<AudioPlayer> players) {
