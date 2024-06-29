@@ -126,7 +126,7 @@ class AudioManager {
   }
 
   static Future<void> fadeOut(AudioPlayer player) async {
-    for (double volume = 0.0; volume <= 1.0; volume += 0.1) {
+    for (double volume = 1.0; volume >= 0.0; volume -= 0.1) {
       await player.setVolume(volume);
       await Future.delayed(const Duration(milliseconds: 50));
     }
