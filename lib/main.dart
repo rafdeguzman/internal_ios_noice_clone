@@ -122,23 +122,40 @@ class AudioManager {
   static Future<void> fadeIn(AudioPlayer player) async {
     for (double volume = 0.0; volume <= 1.0; volume += 0.1) {
       await player.setVolume(volume);
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(seconds: 1));
     }
   }
 
   static Future<void> fadeOut(AudioPlayer player) async {
     for (double volume = 1.0; volume >= 0.0; volume -= 0.1) {
       await player.setVolume(volume);
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(seconds: 2));
     }
   }
 
   static Future<void> playAudio(List<AudioPlayer> players) async {
     for (var i = 0; i < players.length; i++) {
+      late Duration duration;
+      await players[i].onDurationChanged.listen((Duration d) {
+        duration = d;
+        print('file ${i + 1} duration: $d');
+      });
+
       var player = players[i];
       print('Playing sound ${i + 1}');
       await fadeIn(player);
       await player.resume();
+
+      bool isTransitioning = false;
+      player.onPositionChanged.listen((Duration pos) {
+        // while position is changing
+        // get current duration
+        if (!isTransitioning && duration - pos < Duration(seconds: 2)) {
+          // start transitioning to play the next audio
+          isTransitioning = true;
+          print('Sound ${i + 1} is transitioning');
+        }
+      });
 
       // Wait for the player to complete
       bool isCompleted = false;
@@ -149,9 +166,15 @@ class AudioManager {
         }
       });
 
-      // Wait for this audio to finish before moving to the next one
-      while (!isCompleted) {
+      // Wait for this audio to start transitioning before moving to next one
+      while (!isTransitioning) {
         await Future.delayed(Duration(milliseconds: 100));
+      }
+
+      // reset position to start again once audio is done
+      if (isCompleted) {
+        await player.seek(Duration.zero);
+        await player.pause();
       }
 
       // Optionally, fade out the audio
