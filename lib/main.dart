@@ -121,7 +121,6 @@ class AudioManager {
 
   static Future<void> fadeIn(AudioPlayer player) async {
     for (double volume = 0.0; volume <= 1.0; volume += 0.1) {
-      print('volume: $volume');
       await player.setVolume(volume);
       await Future.delayed(const Duration(milliseconds: 100));
     }
@@ -129,7 +128,6 @@ class AudioManager {
 
   static Future<void> fadeOut(AudioPlayer player) async {
     for (double volume = 1.0; volume >= 0.0; volume -= 0.1) {
-      print('volume: $volume');
       await player.setVolume(volume);
       await Future.delayed(const Duration(milliseconds: 100));
     }
@@ -137,9 +135,12 @@ class AudioManager {
 
   static Future<void> playAudio(List<AudioPlayer> players) async {
     for (var i = 0; i < players.length; i++) {
-      late Duration duration;
-      late Duration position;
-      await players[i].onDurationChanged.listen((Duration d) {
+      late Duration duration = Duration.zero;
+      late Duration position = Duration.zero;
+
+      final nextPlayer = players[(i + 1) % players.length - 1];
+
+      players[i].onDurationChanged.listen((Duration d) {
         duration = d;
         print('file ${i + 1} duration: $d');
       });
@@ -154,11 +155,15 @@ class AudioManager {
         // while position is changing
         // get current duration
         position = pos;
-        print(duration - pos);
-        if (!isTransitioning && duration - pos < Duration(seconds: 2)) {
+        if (!isTransitioning && duration - pos <= Duration(seconds: 2)) {
           // start transitioning to play the next audio
           isTransitioning = true;
           print('Sound ${i + 1} is transitioning');
+
+          nextPlayer.resume();
+          fadeIn(nextPlayer);
+
+          fadeOut(player);
         }
       });
 
@@ -171,13 +176,13 @@ class AudioManager {
         }
       });
 
-      // start playing next audio
+      // // start playing next audio
       while (!isTransitioning) {
         await Future.delayed(Duration(milliseconds: 100));
       }
-      while (isTransitioning && player.volume >= 0.01) {
-        await fadeOut(player);
-      }
+      // while (isTransitioning && player.volume >= 0.01) {
+      //   await fadeOut(player);
+      // }
 
       // reset position to start again once audio is done
       if (isCompleted) {
@@ -185,6 +190,7 @@ class AudioManager {
         await player.pause();
       }
     }
+    playAudio(players);
   }
 
   static void disposePlayers(List<AudioPlayer> players) {
