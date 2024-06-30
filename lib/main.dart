@@ -34,34 +34,94 @@ class _HomeState extends State<Home> {
   late List<UrlSource> rainUrls;
   late List<UrlSource> windChimeUrls;
 
+  late AudioManager softWindManager = AudioManager();
+  late AudioManager windChimeManager = AudioManager();
+  late AudioManager rainManager = AudioManager();
+
   String softWindUrl =
       'https://cdn.trynoice.com/library/segments/soft_wind/soft_wind/128k/0001.mp3';
+  String windChimeUrl =
+      'https://cdn.trynoice.com/library/segments/wind_chimes/wind_chimes_0/128k/0002.mp3';
+
+  String rainUrl =
+      'https://cdn.trynoice.com/library/segments/rain/rain_moderate/128k/0001.mp3';
 
   @override
   void dispose() {
     // TODO: implement dispose
     super.dispose();
-    AudioManager.disposePlayers(softWindPlayers);
+    softWindManager.disposePlayers(softWindPlayers);
   }
 
-  void AudioManagerHelper() async {
+  void softWindHelper() async {
     softWindUrls = AudioManager.getUrls(softWindUrl, numSoftWind);
-    await AudioManager.initAudioPlayers(softWindUrls, softWindPlayers);
+    await softWindManager.initAudioPlayers(softWindUrls, softWindPlayers);
     print('player length ${softWindPlayers.length}');
-    await AudioManager.playAudio(softWindPlayers);
+    await softWindManager.playAudio(softWindPlayers);
+  }
+
+  void rainHelper() async {
+    rainUrls = AudioManager.getUrls(rainUrl, numRain);
+    await rainManager.initAudioPlayers(rainUrls, rainPlayers);
+    print('player length ${rainPlayers.length}');
+    await rainManager.playAudio(rainPlayers);
+  }
+
+  void windChimeHelper() async {
+    windChimeUrls = AudioManager.getUrls(windChimeUrl, numWindChime);
+    await windChimeManager.initAudioPlayers(windChimeUrls, windChimePlayers);
+    print('player length ${windChimePlayers.length}');
+    await windChimeManager.playAudio(windChimePlayers);
   }
 
   @override
   void initState() {
     super.initState();
-    AudioManagerHelper();
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
-        child: Text('Hello, World!'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Text('Soft Wind'),
+                IconButton(
+                  onPressed: () {
+                    softWindHelper();
+                  },
+                  icon: Icon(Icons.play_arrow),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Text('Rain'),
+                IconButton(
+                  onPressed: () {
+                    rainHelper();
+                  },
+                  icon: Icon(Icons.play_arrow),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Text('Wind Chime'),
+                IconButton(
+                  onPressed: () {
+                    windChimeHelper();
+                  },
+                  icon: Icon(Icons.play_arrow),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -105,7 +165,7 @@ class AudioManager {
   /*
     creates the audioplayers in accordance to the number of files
   */
-  static Future<void> initAudioPlayers(
+  Future<void> initAudioPlayers(
       List<UrlSource> audioUrls, List<AudioPlayer> players) async {
     players.clear();
     for (var i = 0; i < audioUrls.length; i++) {
@@ -119,21 +179,21 @@ class AudioManager {
     }
   }
 
-  static Future<void> fadeIn(AudioPlayer player) async {
+  Future<void> fadeIn(AudioPlayer player) async {
     for (double volume = 0.0; volume <= 1.0; volume += 0.1) {
       await player.setVolume(volume);
       await Future.delayed(const Duration(milliseconds: 100));
     }
   }
 
-  static Future<void> fadeOut(AudioPlayer player) async {
+  Future<void> fadeOut(AudioPlayer player) async {
     for (double volume = 1.0; volume >= 0.0; volume -= 0.1) {
       await player.setVolume(volume);
       await Future.delayed(const Duration(milliseconds: 100));
     }
   }
 
-  static Future<void> playAudio(List<AudioPlayer> players) async {
+  Future<void> playAudio(List<AudioPlayer> players) async {
     for (var i = 0; i < players.length; i++) {
       late Duration duration = Duration.zero;
       late Duration position = Duration.zero;
@@ -194,7 +254,7 @@ class AudioManager {
     playAudio(players);
   }
 
-  static void disposePlayers(List<AudioPlayer> players) {
+  void disposePlayers(List<AudioPlayer> players) {
     for (var i = 0; i < players.length; i++) {
       players[i].dispose();
     }
