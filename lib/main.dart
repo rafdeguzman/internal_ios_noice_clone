@@ -196,7 +196,7 @@ class AudioManager {
   Future<void> playAudio(List<AudioPlayer> players) async {
     for (var i = 0; i < players.length; i++) {
       late Duration duration = Duration.zero;
-      late Duration position = Duration.zero;
+      // late Duration position = Duration.zero;
 
       final nextPlayer = players[(i + 1) % (players.length)];
 
@@ -214,7 +214,7 @@ class AudioManager {
       player.onPositionChanged.listen((Duration pos) {
         // while position is changing
         // get current duration
-        position = pos;
+        // position = pos;
         if (!isTransitioning && duration - pos <= Duration(seconds: 2)) {
           // start transitioning to play the next audio
           isTransitioning = true;
