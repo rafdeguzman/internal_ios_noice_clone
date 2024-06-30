@@ -138,7 +138,7 @@ class AudioManager {
       late Duration duration = Duration.zero;
       late Duration position = Duration.zero;
 
-      final nextPlayer = players[(i + 1) % players.length - 1];
+      final nextPlayer = players[(i + 1) % (players.length)];
 
       players[i].onDurationChanged.listen((Duration d) {
         duration = d;
@@ -186,6 +186,7 @@ class AudioManager {
 
       // reset position to start again once audio is done
       if (isCompleted) {
+        print('number of players: ${players.length}');
         await player.seek(Duration.zero);
         await player.pause();
       }
